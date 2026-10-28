@@ -1,0 +1,53 @@
+diff --git a/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m b/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m
+index a6f2317..14c86cb 100644
+--- a/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m
++++ b/node_modules/react-native-live-audio-stream/ios/RNLiveAudioStream.m
+@@ -32,10 +32,11 @@ RCT_EXPORT_METHOD(start) {
+                                        mode: AVAudioSessionModeVoiceChat
+                                     options: AVAudioSessionCategoryOptionDuckOthers |
+                                              AVAudioSessionCategoryOptionAllowBluetooth |
+-                                             AVAudioSessionCategoryOptionAllowAirPlay
++                                             AVAudioSessionCategoryOptionAllowAirPlay |
++                                             AVAudioSessionCategoryOptionDefaultToSpeaker
+                                       error: &error];
+     } else {
+-        success = [audioSession setCategory: AVAudioSessionCategoryPlayAndRecord withOptions: AVAudioSessionCategoryOptionDuckOthers error: &error];
++        success = [audioSession setCategory: AVAudioSessionCategoryPlayAndRecord withOptions: AVAudioSessionCategoryOptionDuckOthers | AVAudioSessionCategoryOptionDefaultToSpeaker error: &error];
+         success = [audioSession setMode: AVAudioSessionModeVoiceChat error: &error] && success;
+     }
+     if (!success || error != nil) {
+@@ -61,7 +62,8 @@ RCT_EXPORT_METHOD(start) {
+ RCT_EXPORT_METHOD(stop) {
+     RCTLogInfo(@"[RNLiveAudioStream] stop");
+     if (_recordState.mIsRunning) {
+-        _recordState.mIsRunning = false;
++        AudioQueueFlush(_recordState.mQueue);
+         AudioQueueStop(_recordState.mQueue, true);
++        _recordState.mIsRunning = false;
+         for (int i = 0; i < kNumberBuffers; i++) {
+             AudioQueueFreeBuffer(_recordState.mQueue, _recordState.mBuffers[i]);
+@@ -68,6 +70,24 @@ RCT_EXPORT_METHOD(stop) {
+         }
+         AudioQueueDispose(_recordState.mQueue, true);
+     }
++
++    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
++    NSError *error = nil;
++    BOOL success;
++
++    if (@available(iOS 10.0, *)) {
++        success = [audioSession setCategory: AVAudioSessionCategoryPlayback
++                                       mode: AVAudioSessionModeDefault
++                                    options: AVAudioSessionCategoryOptionMixWithOthers
++                                      error: &error];
++    } else {
++        success = [audioSession setCategory: AVAudioSessionCategoryPlayback withOptions: AVAudioSessionCategoryOptionMixWithOthers error: &error];
++        success = [audioSession setMode: AVAudioSessionModeDefault error: &error] && success;
++    }
++
++    if (!success || error != nil) {
++        RCTLog(@"[RNLiveAudioStream] Problem restoring AVAudioSession playback category. Error: %@", error);
++    }
+ }
+ 
+ void HandleInputBuffer(void *inUserData,

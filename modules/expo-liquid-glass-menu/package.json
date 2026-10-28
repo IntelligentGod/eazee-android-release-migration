@@ -1,0 +1,12 @@
+{
+  "name": "expo-liquid-glass-menu",
+  "version": "1.0.0",
+  "description": "Native UIKit Liquid Glass menu for Eazee.",
+  "license": "MIT",
+  "main": "index.tsx",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

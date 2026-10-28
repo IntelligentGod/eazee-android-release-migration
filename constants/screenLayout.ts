@@ -1,0 +1,3 @@
+export const SCREEN_HEADER_TOP_PADDING = 8;
+export const SCREEN_HEADER_MIN_HEIGHT = 44;
+export const SCREEN_HEADER_BOTTOM_SPACING = 12;

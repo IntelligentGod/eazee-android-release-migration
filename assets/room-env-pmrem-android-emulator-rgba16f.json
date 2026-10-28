@@ -1,0 +1,12 @@
+{
+  "width": 768,
+  "height": 1024,
+  "type": 1016,
+  "format": 1023,
+  "mapping": 306,
+  "colorSpace": "srgb-linear",
+  "byteLength": 6291456,
+  "arrayType": "Uint16Array",
+  "textureTypeName": "HalfFloatType",
+  "generatedAt": "2026-05-26T17:44:04.216Z"
+}

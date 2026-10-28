@@ -1,0 +1,152 @@
+{
+  "expo": {
+    "name": "Eazee",
+    "slug": "wave",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "com.eazee.ai",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/images/eazee-logo-big.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#aeffe8"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "appleTeamId": "4CQHQ9H75G",
+      "bundleIdentifier": "com.eazee.ai",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "com.apple.developer.devicecheck.appattest-environment": "production"
+      },
+      "buildNumber": "18",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Eazee uses microphone access only when you record optional voice input or voice notes for transcription.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.eazee.ai",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "splash": {
+        "image": "./assets/images/eazee-logo-big.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#aeffe8"
+      },
+      "versionCode": 5,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/eazee-adaptive-icon.png",
+        "backgroundColor": "#aeffe8"
+      },
+      "permissions": [
+        "RECORD_AUDIO",
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION"
+      ]
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "./android-manifest.plugin.js",
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/eazee-logo-big.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#aeffe8",
+          "imageWidth": 200
+        }
+      ],
+      [
+        "expo-dev-launcher",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
+      "expo-router",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.66318687320-4nm86m63fits0ph84p1hg6tghg04jf4c"
+        }
+      ],
+      [
+        "@morrowdigital/watermelondb-expo-plugin",
+        {
+          "disableJsi": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          },
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "packagingOptions": {
+              "pickFirst": [
+                "**/libc++_shared.so"
+              ]
+            }
+          }
+        }
+      ],
+      "./ios-device-fixes.plugin.js",
+      "./storekit-config.plugin.js",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "eazee-70"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Eazee only saves images you choose to save. It does not read your photos.",
+          "savePhotosPermission": "Eazee saves your personality card to your photos when you tap Save image.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "23e26ef1-7bc2-4795-8fa3-bb981e6a18e2"
+      }
+    },
+    "owner": "eazee-app"
+  }
+}
