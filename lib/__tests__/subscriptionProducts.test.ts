@@ -6,6 +6,7 @@ jest.mock('expo-iap', () => ({
 import {
   FALLBACK_STORE_PRODUCTS,
   formatPeriodLabel,
+  getAndroidOfferToken,
   getSwitchTargetPlanId,
   getYearlySavingsLabel,
   isUpgrade,
@@ -42,6 +43,54 @@ const storeKitProducts = [
   },
   { id: 'com.eazee.coins', displayPrice: '$1.99' },
 ];
+
+// What expo-iap returns from Google Play for the yearly plan: a 2-week free trial offer and the base plan.
+const playYearlyProduct = {
+  id: 'com.eazee.subscription.pro.yearly',
+  platform: 'android',
+  nameAndroid: 'Eazee Pro Yearly',
+  title: 'Eazee Pro Yearly (Eazee)',
+  displayPrice: 'Free',
+  subscriptionOffers: [
+    {
+      offerTokenAndroid: 'trial-offer',
+      pricingPhasesAndroid: {
+        pricingPhaseList: [
+          { priceAmountMicros: '0', billingPeriod: 'P2W', formattedPrice: 'Free', priceCurrencyCode: 'NZD' },
+          { priceAmountMicros: '139990000', billingPeriod: 'P1Y', formattedPrice: '$139.99', priceCurrencyCode: 'NZD' },
+        ],
+      },
+    },
+    {
+      offerTokenAndroid: 'base-plan',
+      pricingPhasesAndroid: {
+        pricingPhaseList: [{ priceAmountMicros: '139990000', billingPeriod: 'P1Y', formattedPrice: '$139.99', priceCurrencyCode: 'NZD' }],
+      },
+    },
+  ],
+};
+
+describe('Google Play products', () => {
+  it('shows the base plan price, period and the free trial Google offers this account', () => {
+    expect(toStoreProduct(playYearlyProduct)).toMatchObject({
+      planId: 'yearly',
+      title: 'Eazee Pro Yearly',
+      displayPrice: '$139.99',
+      price: 139.99,
+      currency: 'NZD',
+      periodUnit: 'year',
+      periodCount: 1,
+      introOffer: '2-week free trial',
+    });
+  });
+
+  it('buys with the free-trial offer while the account is eligible, else the base plan', () => {
+    expect(getAndroidOfferToken(playYearlyProduct)).toBe('trial-offer');
+    const afterTrial = { ...playYearlyProduct, subscriptionOffers: [playYearlyProduct.subscriptionOffers[1]] };
+    expect(getAndroidOfferToken(afterTrial)).toBe('base-plan');
+    expect(toStoreProduct(afterTrial)?.introOffer).toBeNull();
+  });
+});
 
 describe('toStoreProduct', () => {
   it('takes the name, price, period and free trial from StoreKit', () => {

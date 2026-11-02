@@ -1,7 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { refreshAsync } from 'expo-auth-session';
 import { auth } from '@/firebaseConfig';
 import { clearGoogleTokens, readGoogleTokens, writeGoogleTokens } from '@/lib/googleTokenStorage';
+import { refreshGoogleCalendarAccessTokenOnAndroid } from '@/app/(tabs)/home/socialAuth';
 import { useAuthSession } from './AuthSessionContext';
 import {
   getGoogleOAuthClientId,
@@ -57,10 +59,29 @@ async function validateGoogleAccessToken(accessToken: string): Promise<boolean> 
   }
 }
 
+async function refreshAndroidGoogleAccessToken(userId: string, staleAccessToken: string | null) {
+  try {
+    const accessToken = await refreshGoogleCalendarAccessTokenOnAndroid(staleAccessToken);
+    if (!accessToken || auth.currentUser?.uid !== userId) {
+      return null;
+    }
+
+    await writeGoogleTokens(userId, accessToken, null);
+    return accessToken;
+  } catch {
+    return null;
+  }
+}
+
 async function refreshStoredGoogleAccessToken(
   userId: string,
-  refreshToken: string | null
+  refreshToken: string | null,
+  staleAccessToken: string | null
 ): Promise<string | null> {
+  if (Platform.OS === 'android') {
+    return refreshAndroidGoogleAccessToken(userId, staleAccessToken);
+  }
+
   if (!refreshToken) {
     return null;
   }
@@ -306,7 +327,8 @@ export const TokenProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return null;
     }
 
-    if (!refreshToken) {
+    const canRefreshWithoutRefreshToken = Platform.OS === 'android' && !!accessToken;
+    if (!refreshToken && !canRefreshWithoutRefreshToken) {
       if (!accessToken) {
         return null;
       }
@@ -319,7 +341,7 @@ export const TokenProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return null;
     }
 
-    const nextAccessToken = await refreshStoredGoogleAccessToken(user.uid, refreshToken);
+    const nextAccessToken = await refreshStoredGoogleAccessToken(user.uid, refreshToken, accessToken);
 
     if (!nextAccessToken) {
       await refreshGoogleConnectionStatus();
@@ -425,7 +447,7 @@ export async function getGoogleConnectionStatusStatic(
         };
       }
 
-      if (!storedRefreshToken) {
+      if (!storedRefreshToken && Platform.OS !== 'android') {
         await writeGoogleTokens(userId, null, null);
         return {
           isConnected: hadStoredTokens,
@@ -436,7 +458,10 @@ export async function getGoogleConnectionStatusStatic(
       }
     }
 
-    const refreshedAccessToken = await refreshStoredGoogleAccessToken(userId, storedRefreshToken);
+    // Without stored tokens Calendar was never connected, so a Play services sign-in from the Eazee login must not count.
+    const refreshedAccessToken = hadStoredTokens
+      ? await refreshStoredGoogleAccessToken(userId, storedRefreshToken, storedAccessToken)
+      : null;
     if (refreshedAccessToken) {
       return {
         isConnected: true,

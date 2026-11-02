@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Notifications from 'expo-notifications';
@@ -6,7 +7,7 @@ import { database, getActiveDatabaseName, setActiveDatabaseName } from '@/databa
 import { auth } from '@/firebaseConfig';
 import { getFirebaseAppCheckHeaders } from '@/lib/firebaseAppCheck';
 import { SERVER_URL } from '@/config/backend';
-import { revokeGoogleSignInAccess } from '@/app/(tabs)/home/socialAuth';
+import { revokeGoogleCalendarAccessOnAndroid, revokeGoogleSignInAccess } from '@/app/(tabs)/home/socialAuth';
 import { clearGoogleTokens, readGoogleRefreshTokenForCleanup } from '@/lib/googleTokenStorage';
 
 const ACCOUNT_DELETION_STATE_KEY = 'accountDeletion:v1';
@@ -110,6 +111,12 @@ async function runBestEffort(cleanups: (() => Promise<unknown>)[]) {
 }
 
 async function revokeConnectedGoogleAccess(userId?: string) {
+  if (Platform.OS === 'android') {
+    await revokeGoogleCalendarAccessOnAndroid();
+    await clearGoogleTokens(userId);
+    return;
+  }
+
   const refreshToken = await readGoogleRefreshTokenForCleanup(userId);
   if (!refreshToken) {
     await clearGoogleTokens(userId);
@@ -128,13 +135,14 @@ async function revokeConnectedGoogleAccess(userId?: string) {
 }
 
 async function revokeGoogleAccess(userId: string | undefined, googleProviderUid?: string) {
-  const results = await Promise.allSettled([
-    () => revokeConnectedGoogleAccess(userId),
-    () => revokeGoogleSignInAccess(googleProviderUid),
-  ].map(runCleanupWithTimeout));
-  const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+  // On Android both revocations go through the one Google Sign-In client, so they run in turn.
+  const calendarResult = await runCleanupWithTimeout(() => revokeConnectedGoogleAccess(userId))
+    .then(() => null, (error: unknown) => ({ error }));
+  const signInResult = await runCleanupWithTimeout(() => revokeGoogleSignInAccess(googleProviderUid))
+    .then(() => null, (error: unknown) => ({ error }));
+  const failure = calendarResult || signInResult;
   if (failure) {
-    throw failure.reason;
+    throw failure.error;
   }
 }
 

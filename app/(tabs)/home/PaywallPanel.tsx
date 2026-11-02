@@ -29,6 +29,7 @@ import {
 } from '@/lib/storeBilling';
 import {
   DEFAULT_SUBSCRIPTION_PLAN_ID,
+  SUBSCRIPTION_STORE_NAME,
   buildPlanComparisonRows,
   type ComparisonRow,
   type ComparisonValue,
@@ -242,7 +243,7 @@ export default function PaywallPanel({
       }
 
       if (outcome.status === 'pending') {
-        Alert.alert('Eazee Pro', 'The App Store is still confirming your purchase. Eazee Pro turns on as soon as it does.');
+        Alert.alert('Eazee Pro', `Your purchase is still being confirmed by ${SUBSCRIPTION_STORE_NAME}. Eazee Pro turns on as soon as it is.`);
       }
 
       if (outcome.status === 'unavailable') {
@@ -400,7 +401,7 @@ export default function PaywallPanel({
               </View>
               {orderedProducts.some((product) => product.isFallback) && (
                 <Text style={styles.priceNote}>
-                  Apple confirms the price in your local currency before you subscribe.
+                  {`Your local price is confirmed in ${SUBSCRIPTION_STORE_NAME} before you subscribe.`}
                 </Text>
               )}
 
@@ -472,7 +473,7 @@ export default function PaywallPanel({
       <AiReplyLoadingOverlay
         visible={!!blockingLabel}
         title={blockingLabel ?? ''}
-        subtitle="Confirming with the App Store. This can take a few seconds."
+        subtitle={`Confirming with ${SUBSCRIPTION_STORE_NAME}. This can take a few seconds.`}
       />
     </View>
   );

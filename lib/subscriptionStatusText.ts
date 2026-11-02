@@ -1,4 +1,4 @@
-import type { SubscriptionPlanId, SubscriptionState, SubscriptionStatus } from '@/lib/subscription';
+import { SUBSCRIPTION_STORE_NAME, type SubscriptionPlanId, type SubscriptionState, type SubscriptionStatus } from '@/lib/subscription';
 import type { PurchaseRecord } from '@/lib/subscriptionApi';
 
 export const formatSubscriptionDate = (epochMs: number) =>
@@ -20,7 +20,7 @@ export function describeSubscriptionStatus(status: SubscriptionStatus, now: numb
     case 'cancelled':
       return until ? `Cancelled, active until ${until}` : 'Cancelled';
     case 'billing_retry':
-      return 'Payment issue: update your payment method in the App Store';
+      return `Payment issue: update your payment method in ${SUBSCRIPTION_STORE_NAME}`;
     case 'expired':
       return until ? `Expired on ${until}` : 'Expired';
     case 'refunded':

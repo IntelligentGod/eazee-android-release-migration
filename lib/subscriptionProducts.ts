@@ -77,6 +77,33 @@ const asPeriodUnit = (value: unknown) => PERIOD_UNITS.find((unit) => unit === va
 export const formatPeriodLabel = (product: Pick<StoreProduct, 'periodUnit' | 'periodCount'>) =>
   product.periodCount > 1 ? `/ ${product.periodCount} ${product.periodUnit}s` : `/ ${product.periodUnit}`;
 
+const ISO_PERIOD_UNITS = { D: 'day', W: 'week', M: 'month', Y: 'year' } as const;
+
+/** Google Play's ISO 8601 billing period, e.g. "P1M" or "P2W". */
+const parseBillingPeriod = (period: unknown) => {
+  const match = /^P(\d+)([DWMY])$/.exec(String(period || ''));
+  return match ? { unit: ISO_PERIOD_UNITS[match[2] as keyof typeof ISO_PERIOD_UNITS], count: Number(match[1]) } : null;
+};
+
+const getPricingPhases = (offer: any): any[] => offer?.pricingPhasesAndroid?.pricingPhaseList ?? [];
+
+/** The base plan has a single phase, its regular price; every offer ends with that same phase. */
+const getAndroidBasePlanOffer = (raw: any) => {
+  const offers: any[] = raw?.subscriptionOffers ?? [];
+  return offers.find((offer) => getPricingPhases(offer).length === 1) ?? offers[0] ?? null;
+};
+
+/**
+ * Google Play only lists the offers this account is eligible for, so a free-trial
+ * offer here is one it can still use. Buying with its token starts the trial.
+ */
+export const getAndroidFreeTrialOffer = (raw: any) =>
+  (raw?.subscriptionOffers ?? []).find((offer: any) => getPricingPhases(offer)[0]?.priceAmountMicros === '0') ?? null;
+
+/** The offer token Google Play needs to buy this plan: the free trial when eligible, else the base plan. */
+export const getAndroidOfferToken = (raw: any): string | null =>
+  getAndroidFreeTrialOffer(raw)?.offerTokenAndroid ?? getAndroidBasePlanOffer(raw)?.offerTokenAndroid ?? null;
+
 function describeIntroOffer(raw: any): string | null {
   const offer = Array.isArray(raw?.subscriptionOffers)
     ? raw.subscriptionOffers.find((item: any) => item?.type === 'introductory' && item?.paymentMode === 'free-trial')
@@ -85,25 +112,43 @@ function describeIntroOffer(raw: any): string | null {
     const total = offer.period.value * (offer.periodCount || 1);
     return `${total}-${offer.period.unit} free trial`;
   }
+  const androidTrial = parseBillingPeriod(getPricingPhases(getAndroidFreeTrialOffer(raw))[0]?.billingPeriod);
+  if (androidTrial) return `${androidTrial.count}-${androidTrial.unit} free trial`;
   return raw?.introductoryPricePaymentModeIOS === 'free-trial' ? 'Free trial' : null;
 }
 
-/** StoreKit's product as a plan card, or null for products this app does not sell. */
+/** The plan's regular price on Google Play: the base plan's last phase. */
+function readAndroidRegularPrice(raw: any) {
+  const phase = getPricingPhases(getAndroidBasePlanOffer(raw)).at(-1);
+  if (!phase) return null;
+  const micros = Number(phase.priceAmountMicros);
+  return {
+    displayPrice: String(phase.formattedPrice || ''),
+    price: Number.isFinite(micros) ? micros / 1_000_000 : null,
+    currency: typeof phase.priceCurrencyCode === 'string' ? phase.priceCurrencyCode : null,
+    period: parseBillingPeriod(phase.billingPeriod),
+  };
+}
+
+/** The store's product as a plan card, or null for products this app does not sell. */
 export function toStoreProduct(raw: any): StoreProduct | null {
   const productId = String(raw?.id || '');
   const planId = getPlanIdForProduct(productId);
   if (!planId) return null;
-  const unit = asPeriodUnit(raw?.subscriptionPeriodUnitIOS) ?? (planId === 'yearly' ? 'year' : 'month');
+  const android = raw?.platform === 'android' ? readAndroidRegularPrice(raw) : null;
+  const unit = android?.period?.unit ?? asPeriodUnit(raw?.subscriptionPeriodUnitIOS) ?? (planId === 'yearly' ? 'year' : 'month');
   return {
     productId,
     planId,
-    title: String(raw?.displayNameIOS || raw?.displayName || raw?.title || SUBSCRIPTION_PLANS.find((plan) => plan.id === planId)!.title),
+    title: String(
+      raw?.displayNameIOS || raw?.displayName || raw?.nameAndroid || raw?.title || SUBSCRIPTION_PLANS.find((plan) => plan.id === planId)!.title
+    ),
     description: String(raw?.description || ''),
-    displayPrice: String(raw?.displayPrice || ''),
-    price: typeof raw?.price === 'number' ? raw.price : null,
-    currency: typeof raw?.currency === 'string' ? raw.currency : null,
+    displayPrice: android?.displayPrice || String(raw?.displayPrice || ''),
+    price: android ? android.price : typeof raw?.price === 'number' ? raw.price : null,
+    currency: android?.currency ?? (typeof raw?.currency === 'string' ? raw.currency : null),
     periodUnit: unit,
-    periodCount: Math.max(1, Number(raw?.subscriptionPeriodNumberIOS) || 1),
+    periodCount: Math.max(1, android?.period?.count ?? (Number(raw?.subscriptionPeriodNumberIOS) || 1)),
     introOffer: describeIntroOffer(raw),
     isFallback: false,
   };

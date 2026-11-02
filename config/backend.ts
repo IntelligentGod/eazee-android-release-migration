@@ -12,8 +12,8 @@ const DEVELOPMENT_URL =
   || (Platform.OS === 'android' ? 'http://10.0.2.2:8787' : 'http://localhost:8787');
 
 export const BACKEND_URLS = {
-  // development: DEVELOPMENT_URL,
-  development: 'https://king-prawn-app-clone-r7mhu.ondigitalocean.app',
+  development: DEVELOPMENT_URL,
+  // development: 'https://king-prawn-app-clone-r7mhu.ondigitalocean.app',
   production: 'https://king-prawn-app-clone-r7mhu.ondigitalocean.app',
 } as const;
 

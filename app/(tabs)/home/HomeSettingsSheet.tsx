@@ -8,6 +8,7 @@ import {
   Easing,
   Image,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -98,6 +99,8 @@ type HomeSettingsPanel = 'settings' | 'paywall' | 'aiPersonalization' | 'homePer
 const HOME_BACKGROUND_COLORS: [string, string] = ['#F1ECCE', '#8C8268'];
 const SETTINGS_ACCENT_ICON_COLOR = '#AEFFE8';
 const SETTINGS_ACCENT_ICON_SIZE = 38;
+// Android emoji fonts lack the fingerprint emoji, so it is drawn as an icon in the emoji's color there.
+const FINGERPRINT_ICON_COLOR = '#7B7FE0';
 
 function normalizeHomeSettingsPanel(value?: string): HomeSettingsPanel {
   if (
@@ -1166,7 +1169,9 @@ export default function HomeSettingsSheet({
           />
         )}
         <SettingsRow
-          icon={<Text allowFontScaling={false} style={styles.rowEmoji}>🫆</Text>}
+          icon={Platform.OS === 'android'
+            ? <MaterialCommunityIcons name="fingerprint" size={40} color={FINGERPRINT_ICON_COLOR} />
+            : <Text allowFontScaling={false} style={styles.rowEmoji}>🫆</Text>}
           label="Manage Account"
           targetId={getHomeAccountGuidanceTargetId('settings')}
           onPress={handleOpenManageAccount}

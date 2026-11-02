@@ -1,3 +1,4 @@
+.git
 node_modules/
 .expo/
 dist/
@@ -26,3 +27,4 @@ expo-env.d.ts
 .env.local
 
 !GoogleService-Info.plist
+!google-services.json

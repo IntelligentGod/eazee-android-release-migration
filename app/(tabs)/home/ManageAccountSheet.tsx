@@ -7,6 +7,7 @@ import {
   Dimensions,
   Easing,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -54,7 +55,12 @@ import {
 import { getAccountDeletionReauthenticationProvider } from '@/lib/accountDeletionProviders';
 import { requestGoogleCalendarDisclosure } from '@/lib/googleCalendarDisclosure';
 import { PasswordInput } from './PasswordInput';
-import { reauthenticateWithAppleAccount, reauthenticateWithGoogleAccount } from './socialAuth';
+import { isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
+import {
+  connectGoogleCalendarOnAndroid,
+  reauthenticateWithAppleAccount,
+  reauthenticateWithGoogleAccount,
+} from './socialAuth';
 import ScrollViewWithBar from '@/components/ScrollViewWithBar';
 
 type ManageAccountSheetProps = {
@@ -491,6 +497,28 @@ export default function ManageAccountSheet({ bottomInset, swipeBandHeight, visib
       });
   }, [isCountryPickerReady]);
 
+  const connectGoogleCalendarWithPlayServices = async () => {
+    setIsGoogleExchangeLoading(true);
+    try {
+      const accessToken = await connectGoogleCalendarOnAndroid();
+      if (!accessToken) {
+        return;
+      }
+
+      await setTokens(accessToken, null);
+      Alert.alert('Successfully connected to Google account');
+    } catch (error) {
+      if (isErrorWithCode(error) && error.code === statusCodes.SIGN_IN_CANCELLED) {
+        return;
+      }
+
+      console.error('Error connecting Google account:', error);
+      Alert.alert('Google connection failed', 'There was a problem finishing Google sign-in. Please try again.');
+    } finally {
+      setIsGoogleExchangeLoading(false);
+    }
+  };
+
   const handleGoogleConnect = async () => {
     if (!request?.url || isDeletingAccount) {
       return;
@@ -498,6 +526,11 @@ export default function ManageAccountSheet({ bottomInset, swipeBandHeight, visib
 
     try {
       if (!(await requestGoogleCalendarDisclosure())) {
+        return;
+      }
+
+      if (Platform.OS === 'android') {
+        await connectGoogleCalendarWithPlayServices();
         return;
       }
 

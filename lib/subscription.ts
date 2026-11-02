@@ -90,7 +90,7 @@ export const UNLIMITED_ACCESS_EMAIL = 'developer_sandbox@eazee.ai';
 export const hasUnlimitedAccess = (email?: string | null) =>
   String(email || '').trim().toLowerCase() === UNLIMITED_ACCESS_EMAIL;
 
-const ANDROID_PACKAGE_NAME = 'com.eazee.ai';
+const ANDROID_PACKAGE_NAME = 'ai.eazee.app';
 
 /**
  * Apps cannot cancel store subscriptions themselves; Apple and Google require

@@ -7,8 +7,8 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { auth } from '@/firebaseConfig';
 import { useAuthSession } from '../AuthSessionContext';
 import { getGoogleConnectionStatusStatic, TokenProvider, useTokens } from '../TokenContext';
+import { refreshGoogleCalendarAccessTokenOnAndroid } from '@/app/(tabs)/home/socialAuth';
 import {
-  GOOGLE_ANDROID_CLIENT_ID,
   GOOGLE_IOS_CLIENT_ID,
   GOOGLE_TOKEN_ENDPOINT,
 } from '../googleOAuthConfig';
@@ -38,11 +38,18 @@ jest.mock('@/firebaseConfig', () => ({
   auth: { currentUser: { uid: 'user-1' } },
 }));
 
+jest.mock('@/app/(tabs)/home/socialAuth', () => ({
+  refreshGoogleCalendarAccessTokenOnAndroid: jest.fn(),
+}));
+
 const originalPlatformOS = Platform.OS;
 const mockedAsyncStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 const mockedSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockedRefreshAsync = refreshAsync as jest.MockedFunction<typeof refreshAsync>;
 const mockedUseAuthSession = useAuthSession as jest.MockedFunction<typeof useAuthSession>;
+const mockedRefreshOnAndroid = refreshGoogleCalendarAccessTokenOnAndroid as jest.MockedFunction<
+  typeof refreshGoogleCalendarAccessTokenOnAndroid
+>;
 
 const setPlatformOS = (os: typeof Platform.OS) => {
   Object.defineProperty(Platform, 'OS', {
@@ -98,23 +105,43 @@ describe('TokenContext Google token refresh', () => {
     });
   });
 
-  it('refreshes stored Android Google tokens with the Android client id', async () => {
+  it('refreshes Android Google tokens through Play services without a refresh token', async () => {
     setPlatformOS('android');
+    mockedSecureStore.getItemAsync.mockResolvedValue(JSON.stringify({
+      version: 1,
+      userId: 'user-1',
+      accessToken: 'expired-access-token',
+      refreshToken: null,
+    }));
+    global.fetch = jest.fn(async () => ({ ok: false })) as any;
+    mockedRefreshOnAndroid.mockResolvedValue('play-services-access-token');
 
     const status = await getGoogleConnectionStatusStatic('user-1');
 
-    expect(mockedRefreshAsync).toHaveBeenCalledWith(
-      {
-        clientId: GOOGLE_ANDROID_CLIENT_ID,
-        refreshToken: 'stored-refresh-token',
-      },
-      { tokenEndpoint: GOOGLE_TOKEN_ENDPOINT }
-    );
-    expect(status).toMatchObject({
+    expect(mockedRefreshOnAndroid).toHaveBeenCalledWith('expired-access-token');
+    expect(mockedRefreshAsync).not.toHaveBeenCalled();
+    expect(JSON.parse(String(mockedSecureStore.setItemAsync.mock.calls[0][1]))).toEqual({
+      version: 1,
+      userId: 'user-1',
+      accessToken: 'play-services-access-token',
+      refreshToken: null,
+    });
+    expect(status).toEqual({
       isConnected: true,
       isActive: true,
-      accessToken: 'refreshed-access-token',
+      accessToken: 'play-services-access-token',
+      refreshToken: null,
     });
+  });
+
+  it('does not treat an Android Google login as a Calendar connection', async () => {
+    setPlatformOS('android');
+    mockedSecureStore.getItemAsync.mockResolvedValue(null);
+
+    const status = await getGoogleConnectionStatusStatic('user-1');
+
+    expect(mockedRefreshOnAndroid).not.toHaveBeenCalled();
+    expect(status).toMatchObject({ isConnected: false, isActive: false });
   });
 });
 

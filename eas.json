@@ -21,7 +21,7 @@
         "EXPO_PUBLIC_FIREBASE_APP_CHECK_ENABLED": "true"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     }
   },

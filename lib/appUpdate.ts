@@ -15,7 +15,7 @@ export type AppUpdateStatus =
   | { kind: 'none' }
   | { kind: 'available' | 'required'; latestVersion: string | null; storeUrl: string };
 
-const ANDROID_STORE_URL = `https://play.google.com/store/apps/details?id=${Application.applicationId || 'com.eazee.ai'}`;
+const ANDROID_STORE_URL = `https://play.google.com/store/apps/details?id=${Application.applicationId || 'ai.eazee.app'}`;
 const PROMPT_STORAGE_KEY = 'appUpdate:lastPrompt:v1';
 const PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 6000;

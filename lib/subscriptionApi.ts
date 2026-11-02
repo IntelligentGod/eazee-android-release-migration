@@ -2,6 +2,7 @@ import { SERVER_URL } from '@/config/backend';
 import { auth } from '@/firebaseConfig';
 import { getFirebaseAppCheckHeaders } from '@/lib/firebaseAppCheck';
 import {
+  SUBSCRIPTION_STORE_NAME,
   getPlanIdForProduct,
   type SubscriptionPlanId,
   type SubscriptionState,
@@ -30,7 +31,7 @@ export async function subscriptionApiRequest(path: string, init: { method: 'GET'
   });
   const body = await response.json().catch(() => null);
   if (response.status === 403) {
-    throw new OtherAccountSubscriptionError('This App Store subscription belongs to another Eazee account.');
+    throw new OtherAccountSubscriptionError(`This subscription was bought in ${SUBSCRIPTION_STORE_NAME} by another Eazee account.`);
   }
   if (!response.ok) {
     throw new Error(typeof body?.error === 'string' ? body.error : 'Could not reach Eazee');
@@ -129,6 +130,17 @@ export async function verifyAppleTransaction(signedTransaction: string) {
   return subscriptionApiRequest('/apple/verify', { method: 'POST', body: { signedTransaction } });
 }
 
+/** The server looks the purchase token up with Google Play; the answer is the account's subscription. */
+export async function verifyGooglePurchase(purchaseToken: string) {
+  return subscriptionApiRequest('/google/verify', { method: 'POST', body: { purchaseToken } });
+}
+
+export async function syncGooglePurchases(purchaseTokens: string[]) {
+  const body = await subscriptionApiRequest('/google/sync', { method: 'POST', body: { purchaseTokens } });
+  return body?.subscription as ServerSubscription | undefined;
+}
+
+/** Passed to StoreKit as appAccountToken and to Google Play as the obfuscated account id. */
 export async function fetchAppAccountToken(): Promise<string> {
   const body = await subscriptionApiRequest('/apple/account-token', { method: 'GET' });
   if (typeof body?.appAccountToken !== 'string') {

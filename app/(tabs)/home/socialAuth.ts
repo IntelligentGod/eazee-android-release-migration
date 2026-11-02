@@ -14,7 +14,7 @@ import {
   type UserCredential,
 } from 'firebase/auth';
 import { auth } from '@/firebaseConfig';
-import { FIREBASE_GOOGLE_IOS_CLIENT_ID, FIREBASE_GOOGLE_WEB_CLIENT_ID } from '@/app/context/googleOAuthConfig';
+import { FIREBASE_GOOGLE_IOS_CLIENT_ID, FIREBASE_GOOGLE_WEB_CLIENT_ID, GOOGLE_SCOPES } from '@/app/context/googleOAuthConfig';
 
 let isGoogleConfigured = false;
 
@@ -81,6 +81,50 @@ export async function revokeGoogleSignInAccess(expectedGoogleUid?: string) {
   }
 
   await GoogleSignin.revokeAccess();
+}
+
+const hasGoogleCalendarScopes = (grantedScopes: string[]) =>
+  GOOGLE_SCOPES.every((scope) => grantedScopes.includes(scope));
+
+/**
+ * Google blocks custom-scheme OAuth redirects for Android clients, so on Android
+ * Calendar access is granted through Play services instead of the browser flow.
+ * Resolves to null when the user cancels.
+ */
+export async function connectGoogleCalendarOnAndroid(): Promise<string | null> {
+  configureGoogleSignIn();
+  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+  // Signing out first shows the account picker, so Calendar can use a different account than the Eazee login.
+  await GoogleSignin.signOut().catch(() => {});
+  await GoogleSignin.signIn();
+  const userWithScopes = await GoogleSignin.addScopes({ scopes: GOOGLE_SCOPES });
+  if (!userWithScopes || !hasGoogleCalendarScopes(userWithScopes.scopes)) {
+    return null;
+  }
+
+  return (await GoogleSignin.getTokens()).accessToken;
+}
+
+/** Play services renews the access token itself; there is no refresh token on Android. */
+export async function refreshGoogleCalendarAccessTokenOnAndroid(staleAccessToken: string | null) {
+  configureGoogleSignIn();
+  const googleUser = await GoogleSignin.signInSilently();
+  if (!hasGoogleCalendarScopes(googleUser.scopes)) {
+    return null;
+  }
+
+  if (staleAccessToken) {
+    await GoogleSignin.clearCachedAccessToken(staleAccessToken).catch(() => {});
+  }
+  return (await GoogleSignin.getTokens()).accessToken;
+}
+
+export async function revokeGoogleCalendarAccessOnAndroid() {
+  configureGoogleSignIn();
+  if (GoogleSignin.hasPreviousSignIn()) {
+    await GoogleSignin.revokeAccess();
+  }
 }
 
 export async function isAppleSignInAvailable() {

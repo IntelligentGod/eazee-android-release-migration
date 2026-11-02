@@ -78,6 +78,7 @@ jest.mock('@/database/database', () => ({
 
 jest.mock('@/app/(tabs)/home/socialAuth', () => ({
   revokeGoogleSignInAccess: jest.fn(async () => undefined),
+  revokeGoogleCalendarAccessOnAndroid: jest.fn(async () => undefined),
 }));
 
 const mockedReload = reload as jest.MockedFunction<typeof reload>;

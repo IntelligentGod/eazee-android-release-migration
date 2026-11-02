@@ -1,0 +1,16 @@
+diff --git a/node_modules/react-native-reanimated/android/build.gradle b/node_modules/react-native-reanimated/android/build.gradle
+index e102f43..1a6587c 100644
+--- a/node_modules/react-native-reanimated/android/build.gradle
++++ b/node_modules/react-native-reanimated/android/build.gradle
+@@ -270,7 +270,10 @@ android {
+     }
+     externalNativeBuild {
+         cmake {
+-            version = System.getenv("CMAKE_VERSION") ?: "3.22.1"
++            // Without a pinned version, AGP honors cmake.dir in local.properties (a newer CMake whose ninja handles long Windows paths).
++            if (System.getenv("CMAKE_VERSION")) {
++                version = System.getenv("CMAKE_VERSION")
++            }
+             path "CMakeLists.txt"
+         }
+     }

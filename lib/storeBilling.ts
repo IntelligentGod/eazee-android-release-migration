@@ -4,6 +4,7 @@ import {
   finishTransaction,
   getActiveSubscriptions,
   getAllTransactionsIOS,
+  getAvailablePurchases,
   getUserFriendlyErrorMessage,
   initConnection,
   isUserCancelledError,
@@ -14,12 +15,15 @@ import {
   showManageSubscriptionsIOS,
   type ActiveSubscription,
   type Purchase,
+  type PurchaseAndroid,
+  type RequestSubscriptionPropsByPlatforms,
 } from 'expo-iap';
 
 import { auth } from '@/firebaseConfig';
 import {
   FREE_SUBSCRIPTION_STATUS,
   SUBSCRIPTION_PLANS,
+  SUBSCRIPTION_STORE_NAME,
   getManageSubscriptionUrl,
   getPlanIdForProduct,
   readCachedSubscriptionStatus,
@@ -33,22 +37,33 @@ import {
   fetchAppAccountToken,
   fetchSubscriptionOverview,
   syncAppleTransactions,
+  syncGooglePurchases,
   toSubscriptionStatus,
   verifyAppleTransaction,
+  verifyGooglePurchase,
   type RenewalSnapshot,
   type SubscriptionOverview,
 } from '@/lib/subscriptionApi';
 import { writeCachedSubscriptionLimits } from '@/lib/subscriptionLimits';
 import { mergeServerUsage } from '@/lib/subscriptionUsage';
 import { setAiActionsAllowanceFromStatus } from '@/lib/aiActions';
-import { FALLBACK_STORE_PRODUCTS, loadStoreProducts, type StoreProduct } from '@/lib/subscriptionProducts';
+import {
+  FALLBACK_STORE_PRODUCTS,
+  getAndroidOfferToken,
+  isUpgrade,
+  loadStoreProducts,
+  type StoreProduct,
+} from '@/lib/subscriptionProducts';
 
 /**
- * The server checks Apple's signature, the app, the plan, and that this account
+ * The server checks the purchase with the store (Apple's signature, or Google
+ * Play's own record of the token), the app, the plan, and that this account
  * bought it, then records Pro on the account. Its answer is the source of truth.
  */
-async function verifyTransactionWithServer(signedTransaction: string): Promise<SubscriptionStatus> {
-  const body = await verifyAppleTransaction(signedTransaction);
+async function verifyTransactionWithServer(purchaseToken: string): Promise<SubscriptionStatus> {
+  const body = Platform.OS === 'android'
+    ? await verifyGooglePurchase(purchaseToken)
+    : await verifyAppleTransaction(purchaseToken);
   // New ID tokens carry the Pro claim the server just set, for its own Pro checks.
   await auth.currentUser?.getIdToken(true).catch(() => null);
   if (body?.subscription) return toSubscriptionStatus(body.subscription);
@@ -58,10 +73,10 @@ async function verifyTransactionWithServer(signedTransaction: string): Promise<S
     : { ...FREE_SUBSCRIPTION_STATUS, verifiedAt: Date.now() };
 }
 
-/** Eazee Pro is sold through the App Store only for now. */
-export const isBillingConfigured = () => Platform.OS === 'ios';
+/** Eazee Pro is sold through the App Store and Google Play. */
+export const isBillingConfigured = () => Platform.OS === 'ios' || Platform.OS === 'android';
 
-const NOT_AVAILABLE_MESSAGE = 'Eazee Pro can be purchased on iPhone through the App Store.';
+const NOT_AVAILABLE_MESSAGE = 'Eazee Pro can be purchased in the Eazee app on iPhone or Android.';
 const PRODUCT_IDS = SUBSCRIPTION_PLANS.map((plan) => plan.productId);
 /** StoreKit sometimes reports a downgrade without a new transaction; stop waiting after this. */
 const PURCHASE_RESULT_TIMEOUT_MS = 90_000;
@@ -84,6 +99,30 @@ function ensureStoreConnection() {
 /** Plans with their App Store names and localized prices. */
 export const getStoreProducts = async (): Promise<StoreProduct[]> =>
   isBillingConfigured() ? loadStoreProducts(ensureStoreConnection) : FALLBACK_STORE_PRODUCTS;
+
+/** This device's Google Play subscriptions to Eazee plans. */
+const getGooglePlayPurchases = async () =>
+  ((await getAvailablePurchases()) as PurchaseAndroid[])
+    .filter((purchase) => getPlanIdForProduct(purchase.productId) && purchase.purchaseToken);
+
+/**
+ * Monthly and yearly are separate Play subscriptions, so switching replaces the
+ * current one: an upgrade starts now with the unused time credited, a downgrade
+ * at the next renewal, as on the App Store.
+ */
+async function getGooglePlanChange(targetPlanId: SubscriptionPlanId) {
+  const current = (await getGooglePlayPurchases()).find((purchase) =>
+    purchase.purchaseState === 'purchased' && getPlanIdForProduct(purchase.productId) !== targetPlanId);
+  const currentPlanId = getPlanIdForProduct(current?.productId);
+  if (!current || !currentPlanId) return {};
+  return {
+    purchaseToken: current.purchaseToken,
+    subscriptionProductReplacementParams: {
+      oldProductId: current.productId,
+      replacementMode: isUpgrade(currentPlanId, targetPlanId) ? 'with-time-proration' : 'deferred',
+    },
+  } as const;
+}
 
 const toFailureOutcome = (error: unknown): BillingOutcome =>
   isUserCancelledError(error)
@@ -109,14 +148,23 @@ export async function purchaseSubscription(planId: SubscriptionPlanId): Promise<
     return { status: 'unavailable', message: 'This plan is not available.' };
   }
 
-  let appAccountToken: string;
+  let request: RequestSubscriptionPropsByPlatforms;
   try {
     await ensureStoreConnection();
     const products = await fetchProducts({ skus: [sku], type: 'subs' });
     if (!products?.length) {
-      return { status: 'unavailable', message: 'This plan is not available in the App Store right now.' };
+      return { status: 'unavailable', message: `This plan is not available in ${SUBSCRIPTION_STORE_NAME} right now.` };
     }
-    appAccountToken = await fetchAppAccountToken();
+    const appAccountToken = await fetchAppAccountToken();
+    if (Platform.OS === 'android') {
+      const offerToken = getAndroidOfferToken(products[0]);
+      if (!offerToken) {
+        return { status: 'unavailable', message: `This plan is not available in ${SUBSCRIPTION_STORE_NAME} right now.` };
+      }
+      request = { google: { ...await getGooglePlanChange(planId), skus: [sku], obfuscatedAccountId: appAccountToken, subscriptionOffers: [{ sku, offerToken }] } };
+    } else {
+      request = { apple: { sku, appAccountToken } };
+    }
   } catch (error) {
     return toFailureOutcome(error);
   }
@@ -135,11 +183,16 @@ export async function purchaseSubscription(planId: SubscriptionPlanId): Promise<
     // A plan change can come back as a transaction for either plan, so any of ours settles it.
     const updatedSubscription = purchaseUpdatedListener((purchase: Purchase) => {
       if (!getPlanIdForProduct(purchase.productId)) return;
+      // Google Play reports a purchase awaiting payment (e.g. cash at a store) before it is paid.
+      if (purchase.purchaseState === 'pending') {
+        settle({ status: 'pending' });
+        return;
+      }
       void handleStoreTransaction(purchase)
         .then((status) => settle(
           status.isPro && status.planId
             ? { status: 'success', planId: status.planId }
-            : { status: 'unavailable', message: 'The App Store did not confirm an active subscription.' }
+            : { status: 'unavailable', message: `Eazee could not confirm an active subscription with ${SUBSCRIPTION_STORE_NAME}.` }
         ))
         .catch((error) => settle(
           error instanceof OtherAccountSubscriptionError
@@ -153,7 +206,7 @@ export async function purchaseSubscription(planId: SubscriptionPlanId): Promise<
     const errorSubscription = purchaseErrorListener((error) => settle(toFailureOutcome(error)));
     const timeout = setTimeout(() => settle({ status: 'pending' }), PURCHASE_RESULT_TIMEOUT_MS);
 
-    requestPurchase({ request: { apple: { sku, appAccountToken } }, type: 'subs' })
+    requestPurchase({ request, type: 'subs' })
       .catch((error) => settle(toFailureOutcome(error)));
   });
 
@@ -192,7 +245,7 @@ const transactionsInFlight = new Map<string, Promise<SubscriptionStatus>>();
 
 async function verifyAndFinishTransaction(purchase: Purchase): Promise<SubscriptionStatus> {
   if (!purchase.purchaseToken) {
-    throw new Error('The App Store transaction has no signed data');
+    throw new Error(`The purchase from ${SUBSCRIPTION_STORE_NAME} has no token`);
   }
   try {
     const status = await verifyTransactionWithServer(purchase.purchaseToken);
@@ -226,6 +279,7 @@ const toRenewalSnapshot = (subscription: ActiveSubscription): RenewalSnapshot | 
  */
 async function sendStoreStateToServer(): Promise<boolean> {
   await ensureStoreConnection();
+  if (Platform.OS === 'android') return sendGooglePlayStateToServer();
   const [active, history] = await Promise.all([
     getActiveSubscriptions(PRODUCT_IDS),
     getAllTransactionsIOS().catch(() => [] as Purchase[]),
@@ -245,6 +299,28 @@ async function sendStoreStateToServer(): Promise<boolean> {
     // Bought by another Eazee account on this Apple ID: nothing to apply here.
     if (!(error instanceof OtherAccountSubscriptionError)) throw error;
   }
+  return true;
+}
+
+/**
+ * Sends this device's paid Play subscriptions to the server, which looks each up
+ * with Google (renewals, cancellations, the grace period). A purchase still
+ * unacknowledged after the app closed mid-purchase is acknowledged once the
+ * server has recorded it; Google refunds purchases left unacknowledged for 3 days.
+ */
+async function sendGooglePlayStateToServer(): Promise<boolean> {
+  const purchases = (await getGooglePlayPurchases()).filter((purchase) => purchase.purchaseState === 'purchased');
+  if (!purchases.length) return false;
+  try {
+    await syncGooglePurchases(purchases.slice(0, MAX_SYNCED_TRANSACTIONS).map((purchase) => purchase.purchaseToken!));
+    await auth.currentUser?.getIdToken(true).catch(() => null);
+  } catch (error) {
+    // Bought by another Eazee account on this Google account: nothing to apply here.
+    if (!(error instanceof OtherAccountSubscriptionError)) throw error;
+  }
+  await Promise.all(purchases
+    .filter((purchase) => !purchase.isAcknowledgedAndroid)
+    .map((purchase) => finishTransaction({ purchase, isConsumable: false }).catch(() => {})));
   return true;
 }
 
@@ -273,7 +349,10 @@ export async function restorePurchases(): Promise<BillingOutcome> {
     const { isPro, plan, isUnlimitedAccount } = overview.subscription;
     return isPro && plan && !isUnlimitedAccount
       ? { status: 'success', planId: plan }
-      : { status: 'unavailable', message: 'No active Eazee Pro subscription was found for this Eazee account and Apple ID.' };
+      : {
+        status: 'unavailable',
+        message: `No active Eazee Pro subscription was found for this Eazee account and ${Platform.OS === 'android' ? 'Google account' : 'Apple ID'}.`,
+      };
   } catch (error) {
     return toFailureOutcome(error);
   }
@@ -311,9 +390,9 @@ export function listenForStoreTransactions(onTransaction: () => void) {
   void ensureStoreConnection().catch((error) => console.warn('Could not connect to the App Store:', error));
   try {
     const subscription = purchaseUpdatedListener((purchase: Purchase) => {
-      if (!getPlanIdForProduct(purchase.productId)) return;
+      if (!getPlanIdForProduct(purchase.productId) || purchase.purchaseState === 'pending') return;
       void handleStoreTransaction(purchase)
-        .catch((error) => console.warn('Could not verify App Store transaction:', error))
+        .catch((error) => console.warn('Could not verify store purchase:', error))
         .finally(onTransaction);
     });
     return () => subscription.remove();
