@@ -49,7 +49,7 @@ const IOS_TAB_ICONS = {
   ),
   calendar: MaterialCommunityIcons.getImageSource('calendar-outline', IOS_TAB_ICON_SIZE, IOS_TEMPLATE_ICON_COLOR),
 };
-const TAB_GUIDANCE_ITEMS: { tab: GuidanceTab; label: string; offsetX?: number; offsetY?: number }[] = [
+const TAB_GUIDANCE_ITEMS:{ tab: GuidanceTab; label: string; offsetX?: number; offsetY?: number }[] = [
   { tab: 'chat', label: 'Chat', offsetX: 2 },
   { tab: 'home', label: 'Home', offsetX: 1.25, offsetY: 1 },
   { tab: 'todo', label: 'Todo' },
@@ -75,8 +75,9 @@ function AnimatedTabBarButton({
   children,
   style,
   'aria-selected': ariaSelected,
+  guidanceItem,
   ...props
-}: BottomTabBarButtonProps) {
+}: BottomTabBarButtonProps & { guidanceItem?: (typeof TAB_GUIDANCE_ITEMS)[number] }) {
   const focused = Boolean(ariaSelected);
   const bubbleProgress = useDerivedValue(() =>
     withTiming(focused ? 1 : 0, {
@@ -118,7 +119,19 @@ function AnimatedTabBarButton({
           <View style={styles.activeIconBorder} />
         </LinearGradient>
       </Animated.View>
-      <Animated.View style={iconStyle}>{children}</Animated.View>
+      <Animated.View style={iconStyle}>
+        {guidanceItem ? (
+          // The tutorial measures the icon itself, wherever the tab bar puts it.
+          <GuidedTarget
+            targetId={getTabGuidanceTargetId(guidanceItem.tab)}
+            label={guidanceItem.label}
+            highlightMode="local"
+            localHighlightRadius={999}
+          >
+            {children}
+          </GuidedTarget>
+        ) : children}
+      </Animated.View>
     </PlatformPressable>
   );
 }
@@ -236,7 +249,8 @@ function FloatingTabLayout() {
       initialRouteName="chat"
       backBehavior="history"
       tabBar={(props) => <SwipeableTabBar {...props} />}
-      screenOptions={({ navigation }) => {
+      screenOptions={({ navigation, route }) => {
+        const guidanceItem = TAB_GUIDANCE_ITEMS.find((item) => item.tab === route.name);
         const state = navigation.getState();
         const activeRoute = state.routes[state.index]?.name;
         const tabIconTint =
@@ -268,7 +282,7 @@ function FloatingTabLayout() {
           tabBarHideOnKeyboard: true,
           animation: 'none',
           freezeOnBlur: true,
-          tabBarButton: ({ ref: _ref, ...props }) => <AnimatedTabBarButton {...props} />,
+          tabBarButton: ({ ref: _ref, ...props }) => <AnimatedTabBarButton {...props} guidanceItem={guidanceItem} />,
           tabBarIconStyle: {
             marginTop: 'auto',
             marginBottom: 'auto',

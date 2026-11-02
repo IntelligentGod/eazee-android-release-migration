@@ -2015,6 +2015,8 @@ export default function ChatScreen() {
   // "Get to know me": the invitation shown once Eazee has helped, and whether a profile exists.
   const [aboutMeInvite, setAboutMeInvite] = useState<AboutMeInviteState>({ status: 'dismissed', sessionIds: [] });
   const [hasAboutMeProfile, setHasAboutMeProfile] = useState(true);
+  /** The walkthrough just ended (finished or skipped): it hands over to the invite. */
+  const [shouldOfferAboutMeAfterTutorial, setShouldOfferAboutMeAfterTutorial] = useState(false);
   useEffect(() => {
     const uid = authUser?.uid;
     if (!uid || !isFocused) return;
@@ -4583,6 +4585,7 @@ export default function ChatScreen() {
     if (chatActionValue === 'new') {
       void handleNewChat();
       completeChatGuidanceAction('new');
+      if (chatActionKey.startsWith('tutorial-end-')) setShouldOfferAboutMeAfterTutorial(true);
       return;
     }
 
@@ -5975,15 +5978,38 @@ export default function ChatScreen() {
     // It sits below the last reply, so bring it into view.
     setTimeout(() => queueScrollToBottom(true), 150);
   }, [aboutMeInvite, activeSessionId, authUser?.uid, queueScrollToBottom, showAboutMeInvite]);
-  const answerAboutMeInvite = useCallback((accepted: boolean) => {
+  const answerAboutMeInvite = useCallback((accepted: boolean, current: AboutMeInviteState = aboutMeInvite) => {
     const uid = authUser?.uid;
     if (!uid) return;
-    const next: AboutMeInviteState = { ...aboutMeInvite, status: accepted ? 'accepted' : 'dismissed' };
+    const next: AboutMeInviteState = { ...current, status: accepted ? 'accepted' : 'dismissed' };
     setAboutMeInvite(next);
     void writeAboutMeInviteState(uid, next);
     trackAboutMeEvent(accepted ? 'invite_accepted' : 'invite_dismissed', { entry: 'chat' });
     if (accepted) router.push({ pathname: '/about-me', params: { entry: 'chat' } });
   }, [aboutMeInvite, authUser?.uid, router]);
+  // Right after the walkthrough, the same invite asks once, unless it was already answered
+  // or a profile exists. Read from storage: the screen's copy may not have loaded yet.
+  useEffect(() => {
+    const uid = authUser?.uid;
+    if (!shouldOfferAboutMeAfterTutorial || !uid) return;
+    setShouldOfferAboutMeAfterTutorial(false);
+    void Promise.all([readAboutMeInviteState(uid), readCachedAboutMeProfile(uid)]).then(([invite, profile]) => {
+      if (invite.status !== 'new' || hasAboutMeContent(profile)) return;
+      trackAboutMeEvent('invite_shown', { entry: 'chat' });
+      // After the new chat has appeared, so the question does not cover the screen change.
+      setTimeout(() => {
+        Alert.alert(
+          'Get to know me',
+          'Want Eazee to get you a little better? Tell me about yourself and discover your Eazee personality.',
+          [
+            { text: 'Maybe later', style: 'cancel', onPress: () => answerAboutMeInvite(false, invite) },
+            { text: 'Get to know me', onPress: () => answerAboutMeInvite(true, invite) },
+          ],
+          { cancelable: false }
+        );
+      }, 600);
+    });
+  }, [answerAboutMeInvite, authUser?.uid, shouldOfferAboutMeAfterTutorial]);
 
   const renderChatFooter = useCallback(() => {
     const logoBounceStyle = {
