@@ -37,7 +37,7 @@
         "resizeMode": "contain",
         "backgroundColor": "#aeffe8"
       },
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/eazee-adaptive-icon.png",
         "backgroundColor": "#aeffe8"

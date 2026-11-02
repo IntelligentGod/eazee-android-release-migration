@@ -34,6 +34,7 @@ export async function subscriptionApiRequest(path: string, init: { method: 'GET'
     throw new OtherAccountSubscriptionError(`This subscription was bought in ${SUBSCRIPTION_STORE_NAME} by another Eazee account.`);
   }
   if (!response.ok) {
+    console.warn(`Eazee subscriptions ${init.method} ${path} failed with ${response.status}:`, body);
     throw new Error(typeof body?.error === 'string' ? body.error : 'Could not reach Eazee');
   }
   return body;

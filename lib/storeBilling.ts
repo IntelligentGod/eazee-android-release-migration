@@ -194,14 +194,17 @@ export async function purchaseSubscription(planId: SubscriptionPlanId): Promise<
             ? { status: 'success', planId: status.planId }
             : { status: 'unavailable', message: `Eazee could not confirm an active subscription with ${SUBSCRIPTION_STORE_NAME}.` }
         ))
-        .catch((error) => settle(
-          error instanceof OtherAccountSubscriptionError
-            ? { status: 'unavailable', message: error.message }
-            : {
-              status: 'unavailable',
-              message: 'Your purchase went through, but Eazee could not confirm it yet. It will be applied automatically when you are back online.',
-            }
-        ));
+        .catch((error) => {
+          console.warn('Could not verify the new purchase with Eazee:', error);
+          settle(
+            error instanceof OtherAccountSubscriptionError
+              ? { status: 'unavailable', message: error.message }
+              : {
+                status: 'unavailable',
+                message: 'Your purchase went through, but Eazee could not confirm it yet. It will be applied automatically when you are back online.',
+              }
+          );
+        });
     });
     const errorSubscription = purchaseErrorListener((error) => settle(toFailureOutcome(error)));
     const timeout = setTimeout(() => settle({ status: 'pending' }), PURCHASE_RESULT_TIMEOUT_MS);
