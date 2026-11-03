@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Image, Keyboard, LayoutAnimation, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, Animated, Image, Keyboard, LayoutAnimation, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
@@ -801,16 +801,9 @@ export default function HomePage() {
     const onShow = (event: any) => {
       setIsKeyboardVisible(true);
       const keyboardHeight = event?.endCoordinates?.height || 0;
-      const androidKeyboardTop = event?.endCoordinates?.screenY;
-      const androidWindowHeight = Dimensions.get('window').height;
-      const androidCalculatedOverlap =
-        Platform.OS === 'android' && typeof androidKeyboardTop === 'number'
-          ? Math.max(0, androidWindowHeight - androidKeyboardTop)
-          : keyboardHeight;
-      const keyboardOverlap =
-        Platform.OS === 'android' && keyboardHeight > 0
-          ? Math.min(androidCalculatedOverlap, keyboardHeight)
-          : androidCalculatedOverlap;
+      // Android reports the keyboard without the navigation bar under it, but the composer is
+      // laid out from the bottom of the screen (edge-to-edge), so it must clear both.
+      const keyboardOverlap = Platform.OS === 'android' ? keyboardHeight + insets.bottom : keyboardHeight;
       const nextOffset =
         Platform.OS === 'android'
           ? keyboardOverlap
@@ -837,7 +830,7 @@ export default function HomePage() {
       subShow.remove();
       subHide.remove();
     };
-  }, [aiInputBottom, keyboardOffset]);
+  }, [aiInputBottom, insets.bottom, keyboardOffset]);
 
   useLayoutEffect(() => {
     if (Platform.OS !== 'android') return;

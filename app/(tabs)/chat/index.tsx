@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Dimensions, Easing, FlatList, Image, ImageBackground, Keyboard, Linking, Modal, Platform, RefreshControl, ScrollView, Share, StyleSheet, type ScrollViewProps, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, ImageBackground, Keyboard, Linking, Modal, Platform, RefreshControl, ScrollView, Share, StyleSheet, type ScrollViewProps, Text, TouchableOpacity, View } from 'react-native';
 import MIcon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
@@ -3935,16 +3935,9 @@ export default function ChatScreen() {
     const onShow = (e: any) => {
       setIsKeyboardVisible(true);
       const keyboardHeight = e?.endCoordinates?.height || 0;
-      const androidKeyboardTop = e?.endCoordinates?.screenY;
-      const androidWindowHeight = Dimensions.get('window').height;
-      const androidCalculatedOverlap =
-        Platform.OS === 'android' && typeof androidKeyboardTop === 'number'
-          ? Math.max(0, androidWindowHeight - androidKeyboardTop)
-          : keyboardHeight;
-      const keyboardOverlap =
-        Platform.OS === 'android' && keyboardHeight > 0
-          ? Math.min(androidCalculatedOverlap, keyboardHeight)
-          : androidCalculatedOverlap;
+      // Android reports the keyboard without the navigation bar under it, but the composer is
+      // laid out from the bottom of the screen (edge-to-edge), so it must clear both.
+      const keyboardOverlap = Platform.OS === 'android' ? keyboardHeight + insets.bottom : keyboardHeight;
       setKeyboardInset(Platform.OS === 'android' ? keyboardOverlap : keyboardHeight);
       syncKeyboardScroll();
       const nextOffset =
@@ -3983,7 +3976,7 @@ export default function ChatScreen() {
       subShow.remove();
       subHide.remove();
     };
-  }, [aiInputBottom, keyboardOffset, lockBottomTemporarily, queuePendingAssistantReadAnchor, queueScrollToBottom]);
+  }, [aiInputBottom, insets.bottom, keyboardOffset, lockBottomTemporarily, queuePendingAssistantReadAnchor, queueScrollToBottom]);
 
   useLayoutEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -6415,7 +6408,7 @@ export default function ChatScreen() {
               {!!aiActionsRemainingText && (
                 // Above the composer without moving it: free plans only.
                 <View pointerEvents="none" style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, alignItems: 'center', paddingBottom: 4 }}>
-                  <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 11, fontWeight: '700' }}>{aiActionsRemainingText}</Text>
+                  <Text style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 13, fontWeight: '700' }}>{aiActionsRemainingText}</Text>
                 </View>
               )}
               <GuidedTarget
