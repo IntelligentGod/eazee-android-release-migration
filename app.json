@@ -8,6 +8,12 @@
     "scheme": ["com.eazee.ai", "ai.eazee.app"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/23e26ef1-7bc2-4795-8fa3-bb981e6a18e2"
+    },
     "splash": {
       "image": "./assets/images/eazee-logo-big.png",
       "resizeMode": "contain",
@@ -37,7 +43,7 @@
         "resizeMode": "contain",
         "backgroundColor": "#aeffe8"
       },
-      "versionCode": 10,
+      "versionCode": 11,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/eazee-adaptive-icon.png",
         "backgroundColor": "#aeffe8"
@@ -68,13 +74,18 @@
       "./android-manifest.plugin.js",
       "@react-native-firebase/app",
       "@react-native-firebase/app-check",
+      "./android-no-force-dark.plugin.js",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/eazee-logo-big.png",
           "resizeMode": "contain",
           "backgroundColor": "#aeffe8",
-          "imageWidth": 200
+          "imageWidth": 200,
+          "dark": {
+            "image": "./assets/images/eazee-logo-big.png",
+            "backgroundColor": "#aeffe8"
+          }
         }
       ],
       [

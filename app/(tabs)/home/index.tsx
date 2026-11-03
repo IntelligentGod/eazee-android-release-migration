@@ -2441,6 +2441,7 @@ export default function HomePage() {
             targetId={getHomeControlGuidanceTargetId('tutorial-next-step-snooze')}
             highlightWhenTargetIds={[getHomeControlGuidanceTargetId('tutorial-next-step')]}
             label="Snooze"
+            localHighlightGlow="subtle"
             localHighlightShape="circle"
             localHighlightCirclePadding={2}
             localHighlightPulseScale={1.05}
@@ -2692,6 +2693,7 @@ export default function HomePage() {
       <GuidedTarget
         targetId={getHomeSettingsGuidanceTargetId()}
         label="Settings"
+        localHighlightGlow="subtle"
         localHighlightRadius={999}
         style={{ width: 44, height: 44 }}
       >
@@ -2930,6 +2932,7 @@ export default function HomePage() {
                   <GuidedTarget
                     targetId={getHomeControlGuidanceTargetId('tutorial-next-step')}
                     label="Next step"
+                    localHighlightGlow="subtle"
                     localHighlightShape="rect"
                     localHighlightRadius={22}
                     localHighlightInset={3}
@@ -2981,6 +2984,7 @@ export default function HomePage() {
                 <GuidedTarget
                   targetId={getHomeControlGuidanceTargetId('tutorial-todays-plan')}
                   label="Today's plan"
+                  localHighlightGlow="subtle"
                   localHighlightShape="rect"
                   localHighlightRadius={TODAY_CARD_RADIUS}
                   localHighlightInset={3}

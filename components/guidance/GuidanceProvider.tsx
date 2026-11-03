@@ -238,11 +238,14 @@ function getTabFallbackRect(tab: GuidanceTab, bottomInset: number): Rect {
     };
   }
 
+  // The app draws edge to edge, so the tab bar sits on the screen's bottom edge. Some phones
+  // (Xiaomi) report a window shorter than the screen, which put this ring above the tab bar.
+  const screenHeight = Dimensions.get('screen').height;
   const horizontalMargin = 48;
   const tabBarWidth = Math.max(240, width - horizontalMargin * 2);
   const tabWidth = tabBarWidth / TAB_ORDER.length;
   const centerX = horizontalMargin + tabWidth * index + tabWidth / 2;
-  const centerY = height - 38;
+  const centerY = screenHeight - 38;
 
   return {
     x: centerX - 18,
@@ -1284,6 +1287,7 @@ export function GuidedTarget({
   localHighlightShadowRadius = 14,
   localHighlightShadowOpacity = 0.75,
   localHighlightCirclePadding = 5,
+  localHighlightGlow = 'strong',
 }: {
   targetId: string;
   label?: string;
@@ -1306,6 +1310,8 @@ export function GuidedTarget({
   localHighlightShadowRadius?: number;
   localHighlightShadowOpacity?: number;
   localHighlightCirclePadding?: number;
+  /** "strong" adds glow bands drawn as borders, which Android shows (it ignores the iOS-only shadow). */
+  localHighlightGlow?: 'strong' | 'subtle';
 }) {
   const ref = useRef<View | null>(null);
   const { activeTargetId, registerTarget, updateTargetRect } = useGuidance();
@@ -1340,7 +1346,9 @@ export function GuidedTarget({
   const rightInset = localHighlightRightInset ?? localHighlightInset;
   const topInset = localHighlightTopInset ?? localHighlightInset;
   const bottomInset = localHighlightBottomInset ?? localHighlightInset;
-  const localGlowFrame = localSize && localHighlightShape === 'circle'
+  const localGlowFrame:
+    | { left: number; top: number; width: number; height: number; borderRadius: number }
+    | { top: number; right: number; bottom: number; left: number; borderRadius: number } = localSize && localHighlightShape === 'circle'
     ? {
         left: (localSize.width - circleGlowSize) / 2,
         top: (localSize.height - circleGlowSize) / 2,
@@ -1363,6 +1371,16 @@ export function GuidedTarget({
         left: -leftInset,
         borderRadius: localHighlightRadius,
       };
+  const isStrongGlow = localHighlightGlow === 'strong';
+  const glowBands = isStrongGlow ? [{ spread: 12, opacity: 0.22 }, { spread: 6, opacity: 0.4 }] : [];
+  const pulseScale = {
+    transform: [{
+      scale: pulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, localHighlightPulseScale],
+      }),
+    }],
+  };
 
   return (
     <View
@@ -1372,11 +1390,44 @@ export function GuidedTarget({
       onLayout={handleLayout}
       style={[highlightMode === 'local' && styles.localHighlightRoot, style]}
     >
+      {isLocallyHighlighted && localHighlightVisible ? glowBands.map(({ spread, opacity }) => (
+        <Animated.View
+          key={spread}
+          pointerEvents="none"
+          style={[
+            styles.localHighlightGlowBand,
+            pulseScale,
+            {
+              ...('width' in localGlowFrame
+                ? {
+                    left: localGlowFrame.left - spread,
+                    top: localGlowFrame.top - spread,
+                    width: localGlowFrame.width + spread * 2,
+                    height: localGlowFrame.height + spread * 2,
+                  }
+                : {
+                    top: localGlowFrame.top - spread,
+                    right: localGlowFrame.right - spread,
+                    bottom: localGlowFrame.bottom - spread,
+                    left: localGlowFrame.left - spread,
+                  }),
+              borderRadius: localGlowFrame.borderRadius + spread,
+              borderWidth: spread,
+              borderColor: localHighlightColor,
+              opacity: pulse.interpolate({
+                inputRange: [0, 1],
+                outputRange: [opacity, opacity * 0.55],
+              }),
+            },
+          ]}
+        />
+      )) : null}
       {isLocallyHighlighted && localHighlightVisible ? (
         <Animated.View
           pointerEvents="none"
           style={[
             styles.localHighlightRing,
+            pulseScale,
             {
               ...localGlowFrame,
               borderColor: localHighlightColor,
@@ -1386,14 +1437,8 @@ export function GuidedTarget({
               shadowOpacity: localHighlightShadowOpacity,
               opacity: pulse.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0.92, 0.34],
+                outputRange: isStrongGlow ? [1, 0.7] : [0.92, 0.34],
               }),
-              transform: [{
-                scale: pulse.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, localHighlightPulseScale],
-                }),
-              }],
             },
           ]}
         />
@@ -1763,6 +1808,9 @@ const styles = StyleSheet.create({
   },
   localHighlightRoot: {
     position: 'relative',
+  },
+  localHighlightGlowBand: {
+    position: 'absolute',
   },
   localHighlightRing: {
     position: 'absolute',

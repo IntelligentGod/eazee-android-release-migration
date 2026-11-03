@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Alert, AppState, Linking } from 'react-native';
+import { Alert, AppState, Linking, Platform } from 'react-native';
+import * as ExpoInAppUpdates from 'expo-in-app-updates';
 
 import {
   checkAppUpdate,
@@ -38,7 +39,18 @@ export default function AppUpdateGate() {
       try {
         const status = await checkAppUpdate();
         if (status.kind === 'required') {
-          showRequired(status);
+          // Google Play's full-screen update installs it in place; the alert is the fallback.
+          const startedPlayUpdate = Platform.OS === 'android' && await ExpoInAppUpdates.startUpdate(true).catch(() => false);
+          if (!startedPlayUpdate) showRequired(status);
+          return;
+        }
+        // On Android every build shares the version name, so Google Play (which compares
+        // version codes) says whether there is a newer one, and downloads it in the background.
+        const playUpdate = Platform.OS === 'android' ? await ExpoInAppUpdates.checkForUpdate().catch(() => null) : null;
+        if (playUpdate) {
+          if (!playUpdate.updateAvailable || playUpdate.updateInProgress || !(await shouldPromptForAvailableUpdate(playUpdate.storeVersion))) return;
+          await rememberAvailableUpdatePrompt(playUpdate.storeVersion);
+          await ExpoInAppUpdates.startUpdate(false).catch(() => false);
           return;
         }
         if (status.kind !== 'available' || !(await shouldPromptForAvailableUpdate(status.latestVersion))) return;
