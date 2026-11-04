@@ -21,6 +21,7 @@ import type { ASTNode, RenderRules } from 'react-native-markdown-display';
 import { TodoCard, CalendarListCard, CalendarDetailCard, DailyOverviewCard, DayPlanCard, NavigationShortcutCard, GoalQuotaScheduleCard, PlanLegendCard, RecipeTodoOfferCard, type RecipeTodoOfferCardValue } from './cards';
 import { AiActionsLimitCard, AiActionsNotice } from './cards/AiActionsCards';
 import { formatAiActionsRemaining, getAiActionsAllowance, getAiActionsLimitMessage, useAiActionsAllowance, withAiActions } from '@/lib/aiActions';
+import { getAndroidKeyboardOverlap } from '@/lib/androidKeyboardOverlap';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFloatingTabBarInset } from '@/components/navigation/floatingTabBar';
 import AIInputBox from '@/components/AIInputBox';
@@ -3935,9 +3936,7 @@ export default function ChatScreen() {
     const onShow = (e: any) => {
       setIsKeyboardVisible(true);
       const keyboardHeight = e?.endCoordinates?.height || 0;
-      // Android reports the keyboard without the navigation bar under it, but the composer is
-      // laid out from the bottom of the screen (edge-to-edge), so it must clear both.
-      const keyboardOverlap = Platform.OS === 'android' ? keyboardHeight + insets.bottom : keyboardHeight;
+      const keyboardOverlap = Platform.OS === 'android' ? getAndroidKeyboardOverlap(e, insets.bottom) : keyboardHeight;
       setKeyboardInset(Platform.OS === 'android' ? keyboardOverlap : keyboardHeight);
       syncKeyboardScroll();
       const nextOffset =

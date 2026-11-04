@@ -30,6 +30,7 @@ export const AI_ACTIONS_LOW_THRESHOLD = 2;
 const STORAGE_KEY = 'aiActions:allowance:v1:';
 let current: AiActionsAllowance | null = null;
 const listeners = new Set<(allowance: AiActionsAllowance | null) => void>();
+const usedListeners = new Set<(done: number) => void>();
 
 const today = () => getUsagePeriodKey();
 
@@ -48,6 +49,18 @@ export function subscribeAiActionsAllowance(listener: (allowance: AiActionsAllow
   return () => {
     listeners.delete(listener);
   };
+}
+
+/** Called once actions are settled, with how many really happened, e.g. to show what is left. */
+export function subscribeAiActionsUsed(listener: (done: number) => void) {
+  usedListeners.add(listener);
+  return () => {
+    usedListeners.delete(listener);
+  };
+}
+
+export function reportAiActionsUsed(done: number) {
+  if (done > 0) usedListeners.forEach((listener) => listener(done));
 }
 
 function setAllowance(next: AiActionsAllowance | null) {
@@ -136,6 +149,15 @@ export const AI_ACTIONS_LIMIT_ERROR = 'AI_ACTIONS_LIMIT_REACHED';
 export const getAiActionsLimitMessage = (limit?: number | null) =>
   `You've used your ${typeof limit === 'number' ? `${limit} ` : ''}free AI actions today. You can still chat with Eazee as much as you like! Upgrade to Pro for unlimited AI actions.`;
 
+/** "5 of 8 free AI actions left today", for the pop-up after an action; null when unlimited or not known yet. */
+export function formatAiActionsLeftToday(allowance = getAiActionsAllowance()): string | null {
+  const remaining = getRemainingAiActions(allowance);
+  if (remaining === null || !allowance || allowance.limit === null) return null;
+  return remaining === 0
+    ? 'No free AI actions left today'
+    : `${remaining} of ${allowance.limit} free AI ${allowance.limit === 1 ? 'action' : 'actions'} left today`;
+}
+
 /** "5/8 AI actions remaining"; null when unlimited or not known yet. */
 export function formatAiActionsRemaining(allowance = getAiActionsAllowance()): string | null {
   const remaining = getRemainingAiActions(allowance);
@@ -157,6 +179,7 @@ export async function withAiActions<T>(count: number, save: (granted: number) =>
     return { value: outcome.value, granted };
   } finally {
     if (done < granted) await releaseAiActions(granted - done);
+    reportAiActionsUsed(done);
   }
 }
 

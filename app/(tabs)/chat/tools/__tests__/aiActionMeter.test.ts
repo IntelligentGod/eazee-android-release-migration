@@ -12,6 +12,7 @@ const mockReserve = jest.fn(async (count: number) => {
 const mockRelease = jest.fn(async (count: number) => {
   if (mockAllowance) mockAllowance = { ...mockAllowance, used: Math.max(0, mockAllowance.used - count) };
 });
+const mockReportUsed = jest.fn();
 
 jest.mock('..', () => ({ getToolHandler: () => mockHandler }));
 jest.mock('@/lib/aiActions', () => ({
@@ -22,6 +23,7 @@ jest.mock('@/lib/aiActions', () => ({
     !allowance || allowance.limit === null ? null : Math.max(0, allowance.limit - allowance.used),
   reserveAiActions: (count: number) => mockReserve(count),
   releaseAiActions: (count: number) => mockRelease(count),
+  reportAiActionsUsed: (done: number) => mockReportUsed(done),
 }));
 
 import { executeToolCall } from '../engine';
@@ -50,6 +52,7 @@ describe('executeToolCall with AI actions', () => {
     mockHandler.mockReset();
     mockReserve.mockClear();
     mockRelease.mockClear();
+    mockReportUsed.mockClear();
     mockAllowance = { used: 0, limit: 8, day: 'today' };
   });
 
@@ -61,6 +64,8 @@ describe('executeToolCall with AI actions', () => {
     expect(mockHandler.mock.calls[0][0].items).toHaveLength(3);
     expect(mockRelease).toHaveBeenCalledWith(1);
     expect(mockAllowance?.used).toBe(7);
+    // The pop-up with what is left is told only about what really happened.
+    expect(mockReportUsed).toHaveBeenCalledWith(2);
     expect(result.result.aiActionsLimit).toMatchObject({ notDone: 2 });
     expect(cardTypes(result)).toContain('aiActionsLimit');
   });

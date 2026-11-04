@@ -31,6 +31,7 @@ import HomeBlob, { BLOB_APPEARANCE_PRESETS, type BlobAppearancePresetId } from '
 import FixMyLifeButton from '@/components/FixMyLifeButton';
 import ProRequiredDialog from '@/components/ProRequiredDialog';
 import { checkAiFeatureAccess } from '@/lib/subscriptionUsage';
+import { getAndroidKeyboardOverlap } from '@/lib/androidKeyboardOverlap';
 import type { MoodState } from '@/components/blob/BlobFace';
 import LifeGraphSettingsModal from '@/components/blob/LifeGraphSettingsModal';
 import { useLifeGraph } from '@/lib/useLifeGraph';
@@ -801,9 +802,7 @@ export default function HomePage() {
     const onShow = (event: any) => {
       setIsKeyboardVisible(true);
       const keyboardHeight = event?.endCoordinates?.height || 0;
-      // Android reports the keyboard without the navigation bar under it, but the composer is
-      // laid out from the bottom of the screen (edge-to-edge), so it must clear both.
-      const keyboardOverlap = Platform.OS === 'android' ? keyboardHeight + insets.bottom : keyboardHeight;
+      const keyboardOverlap = Platform.OS === 'android' ? getAndroidKeyboardOverlap(event, insets.bottom) : keyboardHeight;
       const nextOffset =
         Platform.OS === 'android'
           ? keyboardOverlap

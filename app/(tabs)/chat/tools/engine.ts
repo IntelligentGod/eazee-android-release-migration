@@ -11,6 +11,7 @@ import {
   getAiActionsAllowance,
   getRemainingAiActions,
   releaseAiActions,
+  reportAiActionsUsed,
   reserveAiActions,
 } from '@/lib/aiActions';
 
@@ -107,6 +108,7 @@ export async function executeToolCall(
     const done = success ? countAiActionsDone(name, result) : 0;
     if (done < reservedActions) await releaseAiActions(reservedActions - done);
     else if (done > reservedActions) await reserveAiActions(done - reservedActions);
+    reportAiActionsUsed(done);
   }
   const allowance = getAiActionsAllowance();
   const remainingAfter = getRemainingAiActions(allowance);

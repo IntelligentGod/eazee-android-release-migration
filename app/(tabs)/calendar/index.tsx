@@ -6,6 +6,7 @@ import BottomSheet, { BottomSheetBackdrop, BottomSheetModal, BottomSheetTextInpu
 import { database } from '../../../database/database';
 import EventModel from '../../../database/models/EventModel';
 import { stopEventSeriesFrom } from '@/lib/eventSeries';
+import { getAndroidKeyboardOverlap } from '@/lib/androidKeyboardOverlap';
 import { Q } from '@nozbe/watermelondb';
 import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -685,9 +686,7 @@ const CalendarScreen: React.FC = () => {
     const onShow = (event: any) => {
       setIsKeyboardVisible(true);
       const keyboardHeight = event?.endCoordinates?.height || 0;
-      // Android reports the keyboard without the navigation bar under it, but the composer is
-      // laid out from the bottom of the screen (edge-to-edge), so it must clear both.
-      const keyboardOverlap = Platform.OS === 'android' ? keyboardHeight + insets.bottom : keyboardHeight;
+      const keyboardOverlap = Platform.OS === 'android' ? getAndroidKeyboardOverlap(event, insets.bottom) : keyboardHeight;
       setKeyboardInset(Platform.OS === 'android' ? keyboardOverlap : keyboardHeight);
       const nextOffset =
         Platform.OS === 'android'

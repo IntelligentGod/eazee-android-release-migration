@@ -29,6 +29,7 @@ import {
 import WorkspaceScrollArea from '@/components/WorkspaceScrollArea';
 import ScrollViewWithBar from '@/components/ScrollViewWithBar';
 import { isProRequiredMessage } from '@/lib/subscriptionAccess';
+import { getAndroidKeyboardOverlap } from '@/lib/androidKeyboardOverlap';
 import { syncEventReminders } from '@/lib/eventNotifications';
 import { useRouter, useGlobalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -6417,16 +6418,7 @@ const TodoScreen = enhanceWithTodosAndPreferences((props: {
     const onShow = (event: any) => {
       setIsKeyboardVisible(true);
       const keyboardHeight = event?.endCoordinates?.height || 0;
-      const androidKeyboardTop = event?.endCoordinates?.screenY;
-      const androidWindowHeight = Dimensions.get('window').height;
-      const androidCalculatedOverlap =
-        Platform.OS === 'android' && typeof androidKeyboardTop === 'number'
-          ? Math.max(0, androidWindowHeight - androidKeyboardTop)
-          : keyboardHeight;
-      const keyboardOverlap =
-        Platform.OS === 'android' && keyboardHeight > 0
-          ? Math.min(androidCalculatedOverlap, keyboardHeight)
-          : androidCalculatedOverlap;
+      const keyboardOverlap = Platform.OS === 'android' ? getAndroidKeyboardOverlap(event, insets.bottom) : keyboardHeight;
       setKeyboardInset(Platform.OS === 'android' ? keyboardOverlap : keyboardHeight);
       const nextOffset =
         Platform.OS === 'android'
@@ -6459,7 +6451,7 @@ const TodoScreen = enhanceWithTodosAndPreferences((props: {
       subShow.remove();
       subHide.remove();
     };
-  }, [aiInputBottom, keyboardOffset]);
+  }, [aiInputBottom, insets.bottom, keyboardOffset]);
 
   useLayoutEffect(() => {
     if (Platform.OS !== 'android') return;

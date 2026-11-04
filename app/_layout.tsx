@@ -21,6 +21,7 @@ import { RoleSessionProvider } from './context/RoleSessionContext';
 import { TokenProvider } from './context/TokenContext';
 import { GuidanceProvider } from '@/components/guidance/GuidanceProvider';
 import AppDialogHost from '@/components/AppDialogHost';
+import AiActionsLeftToast from '@/components/AiActionsLeftToast';
 import AppUpdateGate from '@/components/AppUpdateGate';
 import { finishPendingAccountDeletion, hasPendingAccountDeletion } from '@/lib/accountDeletion';
 import { setOnboardingPhase } from '@/lib/onboarding';
@@ -382,6 +383,7 @@ export default Sentry.wrap(function RootLayout() {
                     />
                       </Stack>
                       <AppDialogHost />
+                      <AiActionsLeftToast />
                       <AppUpdateGate />
                     </GuidanceProvider>
                   </TabProvider>

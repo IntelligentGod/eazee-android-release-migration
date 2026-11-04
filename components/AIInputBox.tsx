@@ -871,7 +871,8 @@ const AIInputBox: React.FC<AIInputBoxProps> = ({
                 paddingRight: inputPaddingRight,
                 paddingTop: inputPaddingVertical,
                 paddingBottom: inputPaddingVertical,
-                textAlignVertical: multiline ? 'top' : 'center',
+                // Themed bars keep one fixed height and scroll inside, so their text sits in the middle.
+                textAlignVertical: multiline && !usesThemedSurface ? 'top' : 'center',
             }}
             value={localTextInput}
             placeholder={placeholder}

@@ -8,7 +8,7 @@ const VISIBLE_MS = 1800;
  * A short notice that fades in and out on its own, e.g. "Opened a new chat".
  * A new nonce shows it again, even with the same message.
  */
-export default function AppToast({ message, nonce, top = 0 }: { message: string | null; nonce: number; top?: number }) {
+export default function AppToast({ message, nonce, top = 0, visibleMs = VISIBLE_MS }: { message: string | null; nonce: number; top?: number; visibleMs?: number }) {
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -16,12 +16,12 @@ export default function AppToast({ message, nonce, top = 0 }: { message: string 
     opacity.setValue(0);
     const animation = Animated.sequence([
       Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.delay(VISIBLE_MS),
+      Animated.delay(visibleMs),
       Animated.timing(opacity, { toValue: 0, duration: 260, useNativeDriver: true }),
     ]);
     animation.start();
     return () => animation.stop();
-  }, [message, nonce, opacity]);
+  }, [message, nonce, opacity, visibleMs]);
 
   if (!message) return null;
   return (
